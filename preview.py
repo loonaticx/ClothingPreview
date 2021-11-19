@@ -105,6 +105,7 @@ class previewClothing(ShowBase):
         self.accept('3', self.loadBody, ['s', self.botType])
         self.accept('4', self.loadBody, ['m', self.botType])
         self.accept('5', self.loadBody, ['l', self.botType])
+        self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         #self.accept('b', self.torso.showTightBounds)
 
 
@@ -117,7 +118,7 @@ class previewClothing(ShowBase):
         self.clearBody()
         self.type = type
         self.botType = gender
-        torsoModel = loader.loadModel("tt_a_chr_dg{}_{}_torso_1000.egg".format(type, gender)) # can rename this later
+        torsoModel = loader.loadModel("assets/tt_a_chr_dg{}_{}_torso_1000.egg".format(type, gender)) # can rename this later
         self.torso = torsoModel.getChild(0)
         self.torso.reparentTo(render)
         #print(self.torso)
