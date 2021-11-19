@@ -1,0 +1,4 @@
+dist/*
+setup.py
+*.pdb
+*.png
