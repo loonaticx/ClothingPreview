@@ -74,8 +74,6 @@ class previewShoes(ShowBase):
         self.defaultP = 0
         self.currentP = self.defaultP
 
-        self.wantGlasses = False
-
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
         base.setSceneGraphAnalyzerMeter(False)
@@ -124,33 +122,29 @@ class previewShoes(ShowBase):
     Y = shorts, skirt
     """
     def loadBody(self, type='m'): # default: dogM_shorts
-        if self.wantGlasses:
-            self.leg = loader.loadModel("assets/glasses.egg")
-            self.leg.reparentTo(render)
-        else:
-            self.clearBody()
-            self.type = type
-            self.legModel = Actor("assets/tt_a_chr_dg{}_shorts_legs_1000.egg".format(type), {
-                            'neutral': "assets/tt_a_chr_dg{}_shorts_legs_neutral.egg".format(type)
-                            })
-            #self.legModel.pose('neutral', 24)
-            #self.legModel.stop()
-            self.legModel.reparentTo(render)
-            self.leg = self.legModel.getChild(0)
-            for node in self.leg.getChildren():
-                if (node.getName() != 'shoes')\
-                and (node.getName() != 'boots_short')\
-                and (node.getName() != 'boots_long'):
-                    node.stash()
-            if self.shoeTex is not None:
-                self.leg.find('**/shoes').setTexture(self.loadedTextures[0], 1)
-            if self.sBootTex is not None:
-                self.leg.find('**/boots_short').setTexture(self.loadedTextures[1], 1)
-            if self.lBootTex is not None:
-                self.leg.find('**/boots_long').setTexture(self.loadedTextures[2], 1)
-            self.leg.find('**/shoes').setX(self.leftMargin)
-            self.leg.find('**/boots_short').setX(self.midPointX)
-            self.leg.find('**/boots_long').setX(self.rightMargin)
+        self.clearBody()
+        self.type = type
+        self.legModel = Actor("assets/tt_a_chr_dg{}_shorts_legs_1000.egg".format(type), {
+                        'neutral': "assets/tt_a_chr_dg{}_shorts_legs_neutral.egg".format(type)
+                        })
+        #self.legModel.pose('neutral', 24)
+        #self.legModel.stop()
+        self.legModel.reparentTo(render)
+        self.leg = self.legModel.getChild(0)
+        for node in self.leg.getChildren():
+            if (node.getName() != 'shoes')\
+            and (node.getName() != 'boots_short')\
+            and (node.getName() != 'boots_long'):
+                node.stash()
+        if self.shoeTex is not None:
+            self.leg.find('**/shoes').setTexture(self.loadedTextures[0], 1)
+        if self.sBootTex is not None:
+            self.leg.find('**/boots_short').setTexture(self.loadedTextures[1], 1)
+        if self.lBootTex is not None:
+            self.leg.find('**/boots_long').setTexture(self.loadedTextures[2], 1)
+        self.leg.find('**/shoes').setX(self.leftMargin)
+        self.leg.find('**/boots_short').setX(self.midPointX)
+        self.leg.find('**/boots_long').setX(self.rightMargin)
 
         # note: Z-up
         self.leg.setPos(0.00, 4.69, -0.235)
@@ -305,10 +299,7 @@ class previewShoes(ShowBase):
         tex = loader.loadTexture(file)
         self.shoeTex = file
         self.loadedTextures[0] = tex
-        if self.wantGlasses:
-            self.leg.setTexture(tex, 1)
-        else:
-            self.leg.find('**/shoes').setTexture(tex, 1)
+        self.leg.find('**/shoes').setTexture(tex, 1)
 
     def loadSleeveTexture(self, file: str):
         tex = loader.loadTexture(file)
