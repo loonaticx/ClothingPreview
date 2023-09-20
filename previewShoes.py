@@ -67,6 +67,8 @@ class previewShoes(ShowBase):
         self.LshoesVisible = True  # Boots
         self.shoeModels = None
         self.shoeModelsModel = None
+        self.hiddenLeftShoe = False
+        self.hiddenRightShoe = False
         self.type = 'm'  # Body type | s, m, l
         self.defaultCamPos = base.cam.getPos()
         base.camera.hide()
@@ -111,6 +113,8 @@ class previewShoes(ShowBase):
         self.accept('1', self.gotoShoes)
         self.accept('2', self.gotoMid)
         self.accept('3', self.gotoBoots)
+        self.accept('4', self.toggleLeftShoe)
+        self.accept('5', self.toggleRightShoe)
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         # self.accept('b', self.shoeModels.showTightBounds)
 
@@ -175,6 +179,24 @@ class previewShoes(ShowBase):
         for tex in self.loadedTextures:
             if tex:
                 tex.reload()
+
+    def toggleLeftShoe(self):
+        if not self.hiddenLeftShoe:
+            for shoe in self.shoeModels.findAllMatches("**/shoe_left"):
+                shoe.hide()
+        else:
+            for shoe in self.shoeModels.findAllMatches("**/shoe_left"):
+                shoe.show()
+        self.hiddenLeftShoe = not self.hiddenLeftShoe
+
+    def toggleRightShoe(self):
+        if not self.hiddenRightShoe:
+            for shoe in self.shoeModels.findAllMatches("**/shoe_right"):
+                shoe.hide()
+        else:
+            for shoe in self.shoeModels.findAllMatches("**/shoe_right"):
+                shoe.show()
+        self.hiddenRightShoe = not self.hiddenRightShoe
 
     def gotoShoes(self):
         base.cam.setX(self.rightMargin)
