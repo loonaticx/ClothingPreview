@@ -117,10 +117,11 @@ class previewGlasses(ShowBase):
         self.accept('l', self.translateGlassesZ, [0.1])
         self.accept('l-repeat', self.translateGlassesZ, [0.1])
 
-
-
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         #self.accept('b', self.leg.showTightBounds)
+        
+        # most efficient color to use due to antialiasing. 
+        base.setBackgroundColor(0, 0, 0, 0)
 
 
     def loadGlasses(self, path=None):

@@ -109,6 +109,9 @@ class previewClothing(ShowBase):
         self.accept('5', self.loadBody, ['l', self.botType])
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         #self.accept('b', self.torso.showTightBounds)
+        
+        # most efficient color to use due to antialiasing. 
+        base.setBackgroundColor(0, 0, 0, 0)
 
 
     """

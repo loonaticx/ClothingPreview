@@ -115,6 +115,8 @@ class previewShoes(ShowBase):
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         #self.accept('b', self.leg.showTightBounds)
 
+        # most efficient color to use due to antialiasing. 
+        base.setBackgroundColor(0, 0, 0, 0)
 
     """
     ("tt_a_chr_dgX_Y_leg_1000.egg")
