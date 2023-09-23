@@ -4,6 +4,6 @@ set img=none
 for %%x in (*.png) do (
     set img=%%~x
     echo !img!
-    convert !img! -trim  !img!
+    magick convert !img! -trim  !img!
 )
 

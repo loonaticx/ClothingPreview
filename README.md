@@ -15,6 +15,13 @@ Ex:
 Replace ``python preview.py`` with ``C:\Panda3D-1.11.0\python\python.exe preview.py``
 
 
+## Cropping Images
+Upon taking a screenshot, you will notice that there is a lot of leftover whitespace in the image.
+
+``CropImages.bat`` is a handy  utility tool that you can use to automatically trim out all of the unused space in the renders.
+In order to use this script, you will need to download the [ImageMagick SDK](https://imagemagick.org/) ([Mirror](https://github.com/ImageMagick/ImageMagick/releases))
+
+
 ## Controls
 
 Key | Usage
