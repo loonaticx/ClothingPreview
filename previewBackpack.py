@@ -3,7 +3,7 @@ from pathlib import Path
 from direct.actor.Actor import Actor
 
 from tkinter.filedialog import askopenfilename
-from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties
+from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties, AntialiasAttrib
 from direct.gui.DirectGui import *
 import sys, os
 
@@ -76,6 +76,9 @@ class previewBackpack(ShowBase):
 
         self.defaultZ = 0.25  # note: negative goes up, positive goes down
         self.currentZ = self.defaultZ
+        
+        self.enabledAA = True
+        self.enabledBFC = False
 
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
@@ -96,7 +99,7 @@ class previewBackpack(ShowBase):
         self.accept('s', self.aspect2d.hide) # Hacky b/c hiding and showing in same method no work
         self.accept('s-up', self.saveScreenshot)
         self.accept('o', base.oobe)
-        self.accept('b', render.setTwoSided, [True])
+        self.accept('b', self.toggleBFC)
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
         self.accept('wheel_up', self.zoomCamera, [0.1])
@@ -118,10 +121,27 @@ class previewBackpack(ShowBase):
         self.accept('l-repeat', self.translateBackpackZ, [0.1])
 
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
+        self.accept('a', self.toggleAA)
         #self.accept('b', self.leg.showTightBounds)
         
         # most efficient color to use due to antialiasing. 
         base.setBackgroundColor(0, 0, 0, 0)
+        
+        
+        
+    def toggleAA(self):
+        if self.enabledAA:
+            render.setAntialias(AntialiasAttrib.MNone)
+        else:
+            render.setAntialias(AntialiasAttrib.MAuto)
+        self.enabledAA = not self.enabledAA
+        print(f"AA = {self.enabledAA}")
+        
+        
+    def toggleBFC(self):
+        self.enabledBFC = not self.enabledBFC
+        render.setTwoSided(self.enabledBFC)
+
 
 
     def loadBackpack(self, path=None):
