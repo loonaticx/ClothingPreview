@@ -2,3 +2,9 @@ dist/*
 setup.py
 *.pdb
 *.png
+*.rar
+*.mb
+.idea
+.vs
+*.zip
+*.jpg
