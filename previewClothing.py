@@ -115,6 +115,7 @@ class previewClothing(ShowBase):
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
         self.accept('c', self.toggleOrthoView)
+        self.accept('q', sys.exit)
         self.accept('wheel_up', self.zoomCamera, [0.1])
         self.accept('wheel_down', self.zoomCamera, [-0.1])
         self.accept('mouse2', self.defaultCam)
