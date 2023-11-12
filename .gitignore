@@ -8,3 +8,5 @@ setup.py
 .vs
 *.zip
 *.jpg
+.vscode
+.idea
