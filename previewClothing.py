@@ -20,6 +20,13 @@ loadPrcFileData('', 'default-antialias-enable 1')
 loadPrcFileData('', 'framebuffer-multisample 1')
 loadPrcFileData('', 'win-size 1920 1080')
 
+asset_dir = "assets/"
+
+# Clash introduced slightly higher quality Toon bodies. Set below to True to enable the bodies to be used instead.
+USE_CLASH_BODY = False
+if USE_CLASH_BODY:
+    asset_dir += "clash/"
+
 """
 Controls:
 s = Take screenshot
