@@ -4,8 +4,8 @@
   "bam2egg 'phase_4\models\accessories\tt_m_chr_avt_acc_msk_dorkGlasses.bam' 'phase_4\models\accessories\tt_m_chr_avt_acc_msk_dorkGlasses.egg'"
 }
 <Texture> tt_t_chr_avt_acc_msk_dorkGlasses {
-  "phase_4/maps/ttr_t_chr_avt_acc_msk_dorkGlasses_13.jpg"
-  <Scalar> alpha-file { "phase_4/maps/ttr_t_chr_avt_acc_msk_dorkGlasses_13_a.rgb" }
+  "ttr_t_chr_avt_acc_msk_dorkGlasses_1.jpg"
+  <Scalar> alpha-file { "ttr_t_chr_avt_acc_msk_dorkGlasses_1_a.rgb" }
   <Scalar> format { rgba }
   <Scalar> wrapu { repeat }
   <Scalar> wrapv { repeat }
