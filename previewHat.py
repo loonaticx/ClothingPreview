@@ -3,7 +3,8 @@ from pathlib import Path
 from direct.actor.Actor import Actor
 
 from tkinter.filedialog import askopenfilename
-from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties, AntialiasAttrib
+from panda3d.core import Filename, OrthographicLens, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, \
+    FrameBufferProperties, AntialiasAttrib
 from direct.gui.DirectGui import *
 import sys, os
 
@@ -82,6 +83,20 @@ class previewHat(ShowBase):
         self.enabledAA = True
         self.enabledBFC = False
 
+        # Camera
+        # 16 : 9 aspect ratio default
+        scaleMultiplier = 0.25
+        self.filmSizeX_BASE = 16 * scaleMultiplier
+        self.filmSizeY_BASE = 9 * scaleMultiplier
+
+        self.filmSizeX = 16
+        self.filmSizeY = 9
+
+        self.orthoLens = OrthographicLens()
+        self.orthoLens.setFilmSize(self.filmSizeX, self.filmSizeY)
+        self.isOrthoView = False
+        self.defaultLens = base.cam.node().getLens()
+
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
         base.setSceneGraphAnalyzerMeter(False)
@@ -104,6 +119,7 @@ class previewHat(ShowBase):
         self.accept('b', self.toggleBFC)
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
+        self.accept('c', self.toggleOrthoView)
         self.accept('wheel_up', self.zoomCamera, [0.1])
         self.accept('wheel_down', self.zoomCamera, [-0.1])
         self.accept('mouse2', self.defaultCam)
@@ -204,8 +220,12 @@ class previewHat(ShowBase):
     # Camera Modifiers
     def defaultCam(self):
         base.cam.setPos(self.defaultCamPos)
+        self.orthoLens.setFilmSize(self.filmSizeX_BASE, self.filmSizeY_BASE)
 
     def zoomCamera(self, value):
+        self.filmSizeX, self.filmSizeY = self.orthoLens.getFilmSize()
+        self.orthoLens.setFilmSize(self.filmSizeX + (value * self.filmSizeX_BASE / 2),
+                                   self.filmSizeY + (value * self.filmSizeY_BASE / 2))
         base.cam.setPos(base.cam.getX(), base.cam.getY() + value, base.cam.getZ())
 
     ###
@@ -267,6 +287,13 @@ class previewHat(ShowBase):
             self.loadHatTexture(filename)
         except:
             print(str(filename) + " could not be loaded!")
+
+    def toggleOrthoView(self):
+        self.isOrthoView = not self.isOrthoView
+        if self.isOrthoView:
+            base.cam.node().setLens(self.orthoLens)
+        else:
+            base.cam.node().setLens(self.defaultLens)
 
 
 app = previewHat()

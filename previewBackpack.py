@@ -3,7 +3,8 @@ from pathlib import Path
 from direct.actor.Actor import Actor
 
 from tkinter.filedialog import askopenfilename
-from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties, AntialiasAttrib
+from panda3d.core import Filename, OrthographicLens, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, \
+    FrameBufferProperties, AntialiasAttrib
 from direct.gui.DirectGui import *
 import sys, os
 
@@ -11,11 +12,13 @@ import sys, os
 # disable the tk window that pops up.
 # We use tk for the file path selector.
 import tkinter as tk
+
 root = tk.Tk()
 root.withdraw()
 
 # Force high quality for our render
 from panda3d.core import loadPrcFileData
+
 loadPrcFileData('', 'default-antialias-enable 1')
 loadPrcFileData('', 'framebuffer-multisample 1')
 loadPrcFileData('', 'win-size 1920 1080')
@@ -53,10 +56,10 @@ class previewBackpack(ShowBase):
 
     def __init__(self):
         ShowBase.__init__(self)
-        self.fileName = "output" # Output file name
+        self.fileName = "output"  # Output file name
         self.fileFormat = ".png"
         self.midPointX = 0
-        
+
         self.backpackModel = None
         self.backpackTex = None
 
@@ -67,7 +70,7 @@ class previewBackpack(ShowBase):
         self.defaultCamPos = base.cam.getPos()
         base.camera.hide()
         self.i = 1
-        self.defaultH = 180 # todo: hotkey to reset all transformations
+        self.defaultH = 180  # todo: hotkey to reset all transformations
         self.currentH = self.defaultH
         self.defaultP = 0
         self.currentP = self.defaultP
@@ -76,9 +79,23 @@ class previewBackpack(ShowBase):
 
         self.defaultZ = 0.25  # note: negative goes up, positive goes down
         self.currentZ = self.defaultZ
-        
+
         self.enabledAA = True
         self.enabledBFC = False
+
+        # Camera
+        # 16 : 9 aspect ratio default
+        scaleMultiplier = 0.25
+        self.filmSizeX_BASE = 16 * scaleMultiplier
+        self.filmSizeY_BASE = 9 * scaleMultiplier
+
+        self.filmSizeX = 16
+        self.filmSizeY = 9
+
+        self.orthoLens = OrthographicLens()
+        self.orthoLens.setFilmSize(self.filmSizeX, self.filmSizeY)
+        self.isOrthoView = False
+        self.defaultLens = base.cam.node().getLens()
 
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
@@ -96,12 +113,13 @@ class previewBackpack(ShowBase):
             self.loadBackpackModel("path/to/texture.png")
         """
 
-        self.accept('s', self.aspect2d.hide) # Hacky b/c hiding and showing in same method no work
+        self.accept('s', self.aspect2d.hide)  # Hacky b/c hiding and showing in same method no work
         self.accept('s-up', self.saveScreenshot)
         self.accept('o', base.oobe)
         self.accept('b', self.toggleBFC)
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
+        self.accept('c', self.toggleOrthoView)
         self.accept('wheel_up', self.zoomCamera, [0.1])
         self.accept('wheel_down', self.zoomCamera, [-0.1])
         self.accept('mouse2', self.defaultCam)
@@ -109,12 +127,12 @@ class previewBackpack(ShowBase):
         self.accept('arrow_left-repeat', self.rotateBackpackH, [-5])
         self.accept('arrow_right', self.rotateBackpackH, [5])
         self.accept('arrow_right-repeat', self.rotateBackpackH, [5])
-        
+
         self.accept('arrow_up', self.rotateBackpackP, [5])
         self.accept('arrow_up-repeat', self.rotateBackpackP, [5])
         self.accept('arrow_down', self.rotateBackpackP, [-5])
         self.accept('arrow_down-repeat', self.rotateBackpackP, [-5])
-        
+
         self.accept('k', self.translateBackpackZ, [-0.1])
         self.accept('k-repeat', self.translateBackpackZ, [-0.1])
         self.accept('l', self.translateBackpackZ, [0.1])
@@ -122,13 +140,11 @@ class previewBackpack(ShowBase):
 
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
         self.accept('a', self.toggleAA)
-        #self.accept('b', self.leg.showTightBounds)
-        
+        # self.accept('b', self.leg.showTightBounds)
+
         # most efficient color to use due to antialiasing. 
         base.setBackgroundColor(0, 0, 0, 0)
-        
-        
-        
+
     def toggleAA(self):
         if self.enabledAA:
             render.setAntialias(AntialiasAttrib.MNone)
@@ -136,13 +152,10 @@ class previewBackpack(ShowBase):
             render.setAntialias(AntialiasAttrib.MAuto)
         self.enabledAA = not self.enabledAA
         print(f"AA = {self.enabledAA}")
-        
-        
+
     def toggleBFC(self):
         self.enabledBFC = not self.enabledBFC
         render.setTwoSided(self.enabledBFC)
-
-
 
     def loadBackpack(self, path=None):
         self.clearBackpack()
@@ -159,38 +172,36 @@ class previewBackpack(ShowBase):
 
     def loadGUI(self):
         # Todo: figure out how to reposition buttons when window changes size
-        #guiFrame = DirectFrame(frameColor=(0, 0, 0, 1),
+        # guiFrame = DirectFrame(frameColor=(0, 0, 0, 1),
         #              frameSize=(-1, 1, -1, 1),
         #              pos=(1, -1, -1))
-        self.modelButton = DirectButton(text=("Change Backpack Model"),
-                 scale=0.05, pos=(-1.6, 0, -0.4), command=self.openModel)
-        self.texButton = DirectButton(text=("Change Backpack Texture"),
-                 scale=0.05, pos=(-1.6, 0, -0.5), command=self.openTexture)
-
+        self.modelButton = DirectButton(text = ("Change Backpack Model"),
+                                        scale = 0.05, pos = (-1.6, 0, -0.4), command = self.openModel)
+        self.texButton = DirectButton(text = ("Change Backpack Texture"),
+                                      scale = 0.05, pos = (-1.6, 0, -0.5), command = self.openTexture)
 
     def saveScreenshot(self):
         # intent: Image number would increment if the file already exists just so it doesn't overwrite
         self.newfileName = self.fileName
-        if not (os.path.isfile(self.newfileName)): # wip
-            self.newfileName = self.fileName+str(self.i)
-            self.i +=1
+        if not (os.path.isfile(self.newfileName)):  # wip
+            self.newfileName = self.fileName + str(self.i)
+            self.i += 1
 
-        filename = self.newfileName +self.fileFormat
+        filename = self.newfileName + self.fileFormat
         base.win.saveScreenshot(Filename(filename))
         self.aspect2d.show()
         print("Screenshot saved! {}".format(filename))
 
-
     def reloadTextures(self):
         for tex in self.loadedTextures:
-            if tex: tex.reload()
+            if tex:
+                tex.reload()
 
     # Rotate clothing
 
     def rotateBackpackH(self, value):
         self.currentH = self.backpack.getH() + value
         self.backpack.setH(self.currentH)
-
 
     def rotateBackpackP(self, value):
         self.currentP = self.backpack.getP() + value
@@ -201,8 +212,7 @@ class previewBackpack(ShowBase):
         self.backpack.setH(self.currentH)
         self.currentP = self.defaultP
         self.backpack.setP(self.currentP)
-        
-        
+
     def translateBackpackZ(self, value):
         self.currentZ = self.backpack.getZ() + value
         self.backpack.setZ(self.currentZ)
@@ -210,9 +220,14 @@ class previewBackpack(ShowBase):
     # Camera Modifiers
     def defaultCam(self):
         base.cam.setPos(self.defaultCamPos)
+        self.orthoLens.setFilmSize(self.filmSizeX_BASE, self.filmSizeY_BASE)
 
     def zoomCamera(self, value):
+        self.filmSizeX, self.filmSizeY = self.orthoLens.getFilmSize()
+        self.orthoLens.setFilmSize(self.filmSizeX + (value * self.filmSizeX_BASE / 2),
+                                   self.filmSizeY + (value * self.filmSizeY_BASE / 2))
         base.cam.setPos(base.cam.getX(), base.cam.getY() + value, base.cam.getZ())
+
     ###
 
     def browseForImage(self):
@@ -223,7 +238,7 @@ class previewBackpack(ShowBase):
             ("Photoshop File", "*.psd"),
             ("Targa", "*.tga"))))
         return path
-        
+
     def browseForModel(self):
         path = Path(askopenfilename(filetypes = (
             ("Panda3D Model Files", "*.egg;*.bam"),
@@ -234,7 +249,6 @@ class previewBackpack(ShowBase):
     def loadBackpackModel(self, file: str):
         self.backpackModel = file
         self.loadBackpack(self.backpackModel)
-
 
     def loadBackpackTexture(self, file: str):
         # File is an absolute path
@@ -248,15 +262,13 @@ class previewBackpack(ShowBase):
             # todo: panda doesn't like loading _a.rgb like seen below
             # For now let's just only check for an a_rgb if not PNG
             tex = loader.loadTexture(file)
-            #if os.path.isfile(fileTex + '_a.rgb'):
+            # if os.path.isfile(fileTex + '_a.rgb'):
             #    tex = loader.loadTexture(file, fileTex + '_a.rgb')
-            #else:
+            # else:
             #    tex = loader.loadTexture(file)
         self.backpack.setTexture(tex, 1)
         self.backpackTex = file
         self.loadedTextures[0] = tex
-        
-
 
     def openModel(self):
         filename = self.browseForModel()
@@ -276,7 +288,12 @@ class previewBackpack(ShowBase):
         except:
             print(str(filename) + " could not be loaded!")
 
-
+    def toggleOrthoView(self):
+        self.isOrthoView = not self.isOrthoView
+        if self.isOrthoView:
+            base.cam.node().setLens(self.orthoLens)
+        else:
+            base.cam.node().setLens(self.defaultLens)
 
 
 app = previewBackpack()

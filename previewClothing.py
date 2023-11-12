@@ -3,19 +3,21 @@ from pathlib import Path
 from direct.actor.Actor import Actor
 
 from tkinter.filedialog import askopenfilename
-from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties
+from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties, \
+    OrthographicLens
 from direct.gui.DirectGui import *
 import sys, os
-
 # We need to import the tkinter library to
 # disable the tk window that pops up.
 # We use tk for the file path selector.
 import tkinter as tk
+
 root = tk.Tk()
 root.withdraw()
 
 # Force high quality for our render
 from panda3d.core import loadPrcFileData
+
 loadPrcFileData('', 'default-antialias-enable 1')
 loadPrcFileData('', 'framebuffer-multisample 1')
 loadPrcFileData('', 'win-size 1920 1080')
@@ -58,7 +60,7 @@ class previewClothing(ShowBase):
 
     def __init__(self):
         ShowBase.__init__(self)
-        self.fileName = "output" # Output file name
+        self.fileName = "output"  # Output file name
         self.fileFormat = ".png"
         self.topTex = None
         self.sleeveTex = None
@@ -68,14 +70,28 @@ class previewClothing(ShowBase):
         self.bottomsVisible = True
         self.torso = None
         self.type = 'm'
-        self.botType = 'shorts' # just shorts/skirt
+        self.botType = 'shorts'  # just shorts/skirt
         self.defaultCamPos = base.cam.getPos()
         base.camera.hide()
         self.i = 1
-        self.defaultH = 190 # todo: hotkey to reset all transformations
+        self.defaultH = 190  # todo: hotkey to reset all transformations
         self.currentH = self.defaultH
         self.defaultP = 0
         self.currentP = self.defaultP
+
+        # Camera
+        # 16 : 9 aspect ratio default
+        scaleMultiplier = 0.25
+        self.filmSizeX_BASE = 16 * scaleMultiplier
+        self.filmSizeY_BASE = 9 * scaleMultiplier
+
+        self.filmSizeX = 16
+        self.filmSizeY = 9
+
+        self.orthoLens = OrthographicLens()
+        self.orthoLens.setFilmSize(self.filmSizeX, self.filmSizeY)
+        self.isOrthoView = False
+        self.defaultLens = base.cam.node().getLens()
 
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
@@ -93,11 +109,12 @@ class previewClothing(ShowBase):
             self.loadTopTexture("path/to/texture.png")
         """
 
-        self.accept('s', self.aspect2d.hide) # Hacky b/c hiding and showing in same method no work
+        self.accept('s', self.aspect2d.hide)  # Hacky b/c hiding and showing in same method no work
         self.accept('s-up', self.saveScreenshot)
         self.accept('o', base.oobe)
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
+        self.accept('c', self.toggleOrthoView)
         self.accept('wheel_up', self.zoomCamera, [0.1])
         self.accept('wheel_down', self.zoomCamera, [-0.1])
         self.accept('mouse2', self.defaultCam)
@@ -120,36 +137,35 @@ class previewClothing(ShowBase):
         # most efficient color to use due to antialiasing. 
         base.setBackgroundColor(0, 0, 0, 0)
 
-
     """
     ("tt_a_chr_dgX_Y_torso_1000.egg")
     X = s, m, l
     Y = shorts, skirt
     """
-    def loadBody(self, type='m', gender='shorts'): # default: dogM_shorts
+
+    def loadBody(self, type='m', gender='shorts'):  # default: dogM_shorts
         self.clearBody()
         self.type = type
         self.botType = gender
-        torsoModel = loader.loadModel("assets/tt_a_chr_dg{}_{}_torso_1000.egg".format(type, gender)) # can rename this later
+        torsoModel = loader.loadModel(f"{asset_dir}tt_a_chr_dg{type}_{gender}_torso_1000.egg")  # can rename this later
         self.torso = torsoModel.getChild(0)
         self.torso.reparentTo(render)
-        #print(self.torso)
+        # print(self.torso)
 
-
-        #torsoModel.hide()
+        # torsoModel.hide()
         for node in self.torso.getChildren():
-            if (node.getName() != 'torso-top')\
-            and (node.getName() != "torso-bot")\
-            and (node.getName() != 'sleeves'):
+            if (node.getName() != 'torso-top') \
+                    and (node.getName() != "torso-bot") \
+                    and (node.getName() != 'sleeves'):
                 node.stash()
         # note: Z-up
         self.torso.setPos(0.00, 4.69, -0.235)
         self.torso.setH(self.currentH)
         self.torso.setP(self.currentP)
-        if(type == 'l'):
-            self.torso.setPos(self.torso.getX(), self.torso.getY()+ 0.91, self.torso.getZ() - 0.46)
+        if (type == 'l'):
+            self.torso.setPos(self.torso.getX(), self.torso.getY() + 0.91, self.torso.getZ() - 0.46)
         self.torso.setTwoSided(True)
-        #print(self.topTex)
+        # print(self.topTex)
         if self.topTex is not None:
             self.torso.find('**/torso-top').setTexture(self.loadedTextures[0], 1)
         if self.sleeveTex is not None:
@@ -162,54 +178,52 @@ class previewClothing(ShowBase):
             self.torso.removeNode()
             self.torso = None
 
-
     def changeBotType(self):
         if self.botType == 'shorts':
             self.botType = 'skirt'
         elif self.botType == 'skirt':
             self.botType = 'shorts'
         else:
-            self.botType = 'shorts' # Should never hit this but have a failsafe
+            self.botType = 'shorts'  # Should never hit this but have a failsafe
         self.loadBody(self.type, self.botType)
-
 
     def loadGUI(self):
         # Todo: figure out how to reposition buttons when window changes size
-        #guiFrame = DirectFrame(frameColor=(0, 0, 0, 1),
+        # guiFrame = DirectFrame(frameColor=(0, 0, 0, 1),
         #              frameSize=(-1, 1, -1, 1),
         #              pos=(1, -1, -1))
-        self.topButton = DirectButton(text=("Change Top"),
-                 scale=0.05, pos=(-1.6, 0, -0.4), command=self.openTop)
-        self.sleeveButton = DirectButton(text=("Change Sleeve"),
-                 scale=0.05, pos=(-1.6, 0, -0.5), command=self.openSleeves)
-        self.shortsButton = DirectButton(text=("Change Bottoms"),
-                 scale=0.05, pos=(-1.6, 0, -0.6), command=self.openBottom)
+        self.topButton = DirectButton(text = ("Change Top"),
+                                      scale = 0.05, pos = (-1.6, 0, -0.4), command = self.openTop)
+        self.sleeveButton = DirectButton(text = ("Change Sleeve"),
+                                         scale = 0.05, pos = (-1.6, 0, -0.5), command = self.openSleeves)
+        self.shortsButton = DirectButton(text = ("Change Bottoms"),
+                                         scale = 0.05, pos = (-1.6, 0, -0.6), command = self.openBottom)
 
-        self.loadSButton = DirectButton(text=("dogs"),
-                 scale=0.05, pos=(1.6, 0, -0.4),  command=self.loadBody, extraArgs=['s'])
-        self.loadMButton = DirectButton(text=("dogm"),
-                 scale=0.05, pos=(1.6, 0, -0.5),  command=self.loadBody, extraArgs=['m'])
-        self.loadLButton = DirectButton(text=("dogl"),
-                 scale=0.05, pos=(1.6, 0, -0.6),  command=self.loadBody, extraArgs=['l'])
-        self.changeGenderButton = DirectButton(text=("Change gender"),
-                 scale=0.05, pos=(1.6, 0, -0.7),  command=self.changeBotType)
+        self.loadSButton = DirectButton(text = ("dogs"),
+                                        scale = 0.05, pos = (1.6, 0, -0.4), command = self.loadBody, extraArgs = ['s'])
+        self.loadMButton = DirectButton(text = ("dogm"),
+                                        scale = 0.05, pos = (1.6, 0, -0.5), command = self.loadBody, extraArgs = ['m'])
+        self.loadLButton = DirectButton(text = ("dogl"),
+                                        scale = 0.05, pos = (1.6, 0, -0.6), command = self.loadBody, extraArgs = ['l'])
+        self.changeGenderButton = DirectButton(text = ("Change gender"),
+                                               scale = 0.05, pos = (1.6, 0, -0.7), command = self.changeBotType)
 
     def saveScreenshot(self):
         # intent: Image number would increment if the file already exists just so it doesn't overwrite
         self.newfileName = self.fileName
-        if not (os.path.isfile(self.newfileName)): # wip
-            self.newfileName = self.fileName+str(self.i)
-            self.i +=1
+        if not (os.path.isfile(self.newfileName)):  # wip
+            self.newfileName = self.fileName + str(self.i)
+            self.i += 1
 
-        filename = self.newfileName +self.fileFormat
+        filename = self.newfileName + self.fileFormat
         base.win.saveScreenshot(Filename(filename))
         self.aspect2d.show()
         print("Screenshot saved! {}".format(filename))
 
-
     def reloadTextures(self):
         for tex in self.loadedTextures:
-            if tex: tex.reload()
+            if tex:
+                tex.reload()
 
     # temporary until i have a better way to do this lol
     def toggleShirt(self):
@@ -234,13 +248,11 @@ class previewClothing(ShowBase):
             self.torso.find('**/torso-bot').show()
             self.bottomsVisible = True
 
-
     # Rotate clothing
 
     def rotateClothingH(self, value):
         self.currentH = self.torso.getH() + value
         self.torso.setH(self.currentH)
-
 
     def rotateClothingP(self, value):
         self.currentP = self.torso.getP() + value
@@ -255,8 +267,12 @@ class previewClothing(ShowBase):
     # Camera Modifiers
     def defaultCam(self):
         base.cam.setPos(self.defaultCamPos)
+        self.orthoLens.setFilmSize(self.filmSizeX_BASE, self.filmSizeY_BASE)
 
     def zoomCamera(self, value):
+        self.filmSizeX, self.filmSizeY = self.orthoLens.getFilmSize()
+        self.orthoLens.setFilmSize(self.filmSizeX + (value * self.filmSizeX_BASE / 2),
+                                   self.filmSizeY + (value * self.filmSizeY_BASE / 2))
         base.cam.setPos(base.cam.getX(), base.cam.getY() + value, base.cam.getZ())
     ###
 
@@ -314,6 +330,13 @@ class previewClothing(ShowBase):
             self.loadBottomTexture(filename)
         except:
             print(str(filename) + " could not be loaded!")
+
+    def toggleOrthoView(self):
+        self.isOrthoView = not self.isOrthoView
+        if self.isOrthoView:
+            base.cam.node().setLens(self.orthoLens)
+        else:
+            base.cam.node().setLens(self.defaultLens)
 
 
 app = previewClothing()

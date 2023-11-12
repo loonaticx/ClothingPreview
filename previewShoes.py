@@ -3,7 +3,7 @@ from pathlib import Path
 from direct.actor.Actor import Actor
 
 from tkinter.filedialog import askopenfilename
-from panda3d.core import Filename, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties
+from panda3d.core import Filename, OrthographicLens, GraphicsOutput, WindowProperties, Texture, GraphicsPipe, FrameBufferProperties
 from direct.gui.DirectGui import *
 import sys, os
 
@@ -20,7 +20,7 @@ from panda3d.core import loadPrcFileData
 
 loadPrcFileData('', 'default-antialias-enable 1')
 loadPrcFileData('', 'framebuffer-multisample 1')
-loadPrcFileData('', 'win-size 800 800')
+loadPrcFileData('', 'win-size 1600 900')
 
 """
 Controls:
@@ -77,6 +77,20 @@ class previewShoes(ShowBase):
         self.currentH = self.defaultH
         self.defaultP = 0
         self.currentP = self.defaultP
+        
+        # Camera
+        # 16 : 9 aspect ratio default
+        scaleMultiplier = 0.25
+        self.filmSizeX_BASE = 16 * scaleMultiplier
+        self.filmSizeY_BASE = 9 * scaleMultiplier
+        
+        self.filmSizeX = 16
+        self.filmSizeY = 9
+        
+        self.orthoLens = OrthographicLens()
+        self.orthoLens.setFilmSize(self.filmSizeX, self.filmSizeY)
+        self.isOrthoView = False
+        self.defaultLens = base.cam.node().getLens()
 
         # Just in case we have these enabled in the config...
         base.setFrameRateMeter(False)
@@ -99,6 +113,7 @@ class previewShoes(ShowBase):
         self.accept('o', base.oobe)
         self.accept('r', self.reloadTextures)
         self.accept('e', self.defaultRotation)
+        self.accept('c', self.toggleOrthoView)
         self.accept('wheel_up', self.zoomCamera, [0.1])
         self.accept('wheel_down', self.zoomCamera, [-0.1])
         self.accept('mouse2', self.defaultCam)
@@ -287,10 +302,12 @@ class previewShoes(ShowBase):
     # Camera Modifiers
     def defaultCam(self):
         base.cam.setPos(self.defaultCamPos)
+        self.orthoLens.setFilmSize(self.filmSizeX_BASE, self.filmSizeY_BASE)
 
     def zoomCamera(self, value):
+        self.filmSizeX, self.filmSizeY = self.orthoLens.getFilmSize()
+        self.orthoLens.setFilmSize(self.filmSizeX + (value * self.filmSizeX_BASE/2), self.filmSizeY+ (value* self.filmSizeY_BASE/2))
         base.cam.setPos(base.cam.getX(), base.cam.getY() + value, base.cam.getZ())
-
     ###
 
     def browseForImage(self):
@@ -347,6 +364,13 @@ class previewShoes(ShowBase):
             self.loadBottomTexture(filename)
         except:
             print(str(filename) + " could not be loaded!")
+
+    def toggleOrthoView(self):
+        self.isOrthoView = not self.isOrthoView
+        if self.isOrthoView:
+            base.cam.node().setLens(self.orthoLens)
+        else:
+            base.cam.node().setLens(self.defaultLens)
 
 
 app = previewShoes()
