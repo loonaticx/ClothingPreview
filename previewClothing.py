@@ -79,6 +79,9 @@ class previewClothing(ShowBase):
         self.defaultP = 0
         self.currentP = self.defaultP
 
+        self.tightBoundsToggled = False
+        self.boundsToggled = False
+
         # Camera
         # 16 : 9 aspect ratio default
         scaleMultiplier = 0.25
@@ -133,8 +136,10 @@ class previewClothing(ShowBase):
         self.accept('4', self.loadBody, ['m', self.botType])
         self.accept('5', self.loadBody, ['l', self.botType])
         self.accept('p', print, ["H = {}, P = {}".format(self.defaultH, self.defaultP)])
-        #self.accept('b', self.torso.showTightBounds)
-        
+        self.accept('b', self.toggleTightBounds)
+        self.accept('shift-b', self.toggleBounds)
+
+
         # most efficient color to use due to antialiasing. 
         base.setBackgroundColor(0, 0, 0, 0)
 
@@ -338,6 +343,22 @@ class previewClothing(ShowBase):
             base.cam.node().setLens(self.orthoLens)
         else:
             base.cam.node().setLens(self.defaultLens)
+
+
+    def toggleTightBounds(self):
+        self.tightBoundsToggled = not self.tightBoundsToggled
+        if self.tightBoundsToggled:
+            self.boundsToggled = True
+            self.torso.showTightBounds()
+        else:
+            self.torso.hideBounds()
+
+    def toggleBounds(self):
+        self.boundsToggled = not self.boundsToggled
+        if self.boundsToggled:
+            self.torso.showBounds()
+        else:
+            self.torso.hideBounds()
 
 
 app = previewClothing()
