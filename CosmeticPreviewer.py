@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from enum import IntEnum
 from pathlib import Path
 from tkinter.filedialog import askopenfilename
-
+import sys, os
 from direct.gui.DirectButton import DirectButton
 from direct.gui.DirectFrame import DirectFrame
 from direct.showbase.ShowBase import ShowBase
@@ -47,22 +46,29 @@ class Body:
 
     @property
     def otherBottomType(self):
-        print(f"bottom type rn is {self.bottomType}")
         if self.bottomType == "shorts":
             return "skirt"
         return "shorts"
 
-    def getOtherBottomType(self):
-        return self.otherBottomType
-
 
 # Todo: Read from a config file
 class CosmeticPreviewer(ShowBase):
+
+
+    cosmeticName2Default = {
+        "hat": "",
+        "backpack": "",
+        "shoes": "",
+        "glasses": ""
+    }
+
     def __init__(self):
         super().__init__(self)
         self.activeCosmetics = []
         self.bodyModels = dict()
         self.bodyGroup = render.attachNewNode("body_grp")
+        self.accGroup = render.attachNewNode("acc_grp")
+
         self.clothing = Clothing(self.bodyGroup)
         self.activeBody = None  # ['m', 'shorts']
         self.defaultH = 190
@@ -91,13 +97,17 @@ class CosmeticPreviewer(ShowBase):
         self.accept('shift-l', render.ls)
         self.accept('shift-a', render.analyze)
         self.accept('o', base.oobe)
+        self.accept('q', sys.exit)
 
         self.accept('1', self.applyClothingChange, extraArgs = ['torso-top'])
         self.accept('2', self.setActiveBody, extraArgs = ['m', 'shorts'])
         self.accept('3', self.previewClothing)
 
         self._loadBodyModels()
+        self._loadAccessoryModels()
         self.setActiveBody('m', 'shorts')
+        self.activeAccessory = None
+        CosmeticPreviewerGUI(self, aspect2d)
 
     def _loadBodyModels(self):  # default: dogM_shorts
         for bodyType in ('m', 's', 'l'):
@@ -114,15 +124,24 @@ class CosmeticPreviewer(ShowBase):
                 self.bodyModels[bodyAttrs] = body
                 body.hide()
 
-    def setupBodyPos(self, body):
-        body.setPos(-0.91, -4.9, -0.3)
+    def _loadAccessoryModels(self):
+        self.accessoryModels = {
+            "hat": Accessory(loader.loadModel(f"assets/tt_m_chr_avt_acc_hat_baseball.egg")),
+            "glasses": Accessory(loader.loadModel(f"assets/glasses.egg")),
+            "backpack": Accessory(loader.loadModel(f"assets/backpack.egg")),
+            "shoes": Accessory(loader.loadModel(f"assets/glasses.egg")),
+        }
+        for model in self.accessoryModels.values():
+            model.reparentTo(self.accGroup)
+            model.hide()
 
+    def setupBodyPos(self, body):
+        # Todo: Find good pos for long body
+        body.setPos(-0.91, -4.9, -0.3)
         self.bodyGroup.setH(self.currentH)
         self.bodyGroup.setP(self.currentP)
 
     def setActiveBody(self, bodyType=None, bottomType=None, flipBottom=False):
-        print(f"bottomType = {bottomType}")
-
         if self.activeBody:
             if not bodyType:
                 bodyType = self.activeBody.bodyType
@@ -131,22 +150,50 @@ class CosmeticPreviewer(ShowBase):
         if flipBottom:
             bottomType = self.activeBody.otherBottomType
 
-        self.hideBody()
+        self.viewBody(visible = False)
         self.activeBody = Body(bodyType, bottomType)
         bodyModel = self.bodyModels[self.activeBody]
         bodyModel.show()
 
-    def hideBody(self):
+    def applyNewAccessory(self, accType):
+        newAccessory = self.loadAccessory()
+        self.accessoryModels[accType] = newAccessory
+
+    def setActiveAccessory(self, newAccessory):
+        self.viewBody(visible = False)
+        if self.activeAccessory and self.activeAccessory.accessoryType == newAccessory.accessoryType:
+            self.activeAccessory.removeNode()
+            self.activeAccessory = newAccessory
+        self.accessoryModels[newAccessory.accessoryType] = newAccessory
+        newAccessory.show()
+
+    def viewBody(self, visible=False):
         if not self.activeBody:
             return
         activeBody = self.bodyModels[self.activeBody]
-        activeBody.hide()
+        if visible:
+            activeBody.show()
+        else:
+            activeBody.hide()
 
-    def previewHats(self):
-        pass
+    def toggleBodyControls(self, enable_controls=True):
+        if enable_controls:
+            self.accept('wheel_up', self.zoomCamera, [0.1])
+            self.accept('wheel_down', self.zoomCamera, [-0.1])
+        else:
+            self.ignore('wheel_up')
+            self.ignore('wheel_down')
+
+    def viewAccessory(self, accType):
+        print(f"type = {accType}")
+        self.viewBody(visible=False)
+        if self.activeAccessory:
+            self.activeAccessory.hide()
+        self.activeAccessory = self.accessoryModels[accType]  # default accessory model
+        self.activeAccessory.show()
 
     def previewClothing(self):
-        CosmeticPreviewerGUI(self, base.aspect2d)
+        pass
 
     def browseForImage(self):
         path = Path(askopenfilename(filetypes = (
@@ -159,6 +206,24 @@ class CosmeticPreviewer(ShowBase):
 
         return path
 
+    def browseForModel(self):
+        path = Path(askopenfilename(filetypes = (
+            ("Panda3D Model Files", "*.egg;*.bam"),
+        )))
+        return path
+
+    def loadAccessory(self):
+        filename = self.browseForModel()
+        if str(filename) == ".":
+            return
+        try:
+            return Accessory(loader.loadModel(filename))
+        except Exception as e:
+            print(str(filename) + " could not be loaded!")
+            print(f"Stack trace: {e}")
+            return None
+
+
     def loadCosmeticTexture(self, cosmetic):
         filename = self.browseForImage()
         if str(filename) == ".":
@@ -170,6 +235,9 @@ class CosmeticPreviewer(ShowBase):
             print(f"Stack trace: {e}")
             return None
 
+    def removeCosmetic(self, cosmetic):
+        pass
+
     def getBodyPartNode(self, body, part):
         bodyModel = self.bodyModels[body]
         return bodyModel.find(f"**/{part}")
@@ -179,6 +247,7 @@ class CosmeticPreviewer(ShowBase):
         tex = self.loadCosmeticTexture(clothing)
         if tex:
             clothing.setPartTexture(part_name, tex)
+
 
     # Camera Modifiers
     def defaultCam(self):
@@ -195,6 +264,20 @@ class CosmeticPreviewer(ShowBase):
 
 
 class CosmeticPreviewerGUI(DirectFrame):
+
+    _marginX = 1
+    _marginY = 1
+    xAmt = -1
+    yAmt = -1
+
+
+    def refresh_ui(func, *args):
+        def prep(self, *args):
+            self.hideActiveGui()
+            func(self, *args)
+
+        return prep
+
     def __init__(self, previewer, parent, **kw):
         optiondefs = ()
         self.defineoptions(kw, optiondefs)
@@ -202,57 +285,229 @@ class CosmeticPreviewerGUI(DirectFrame):
         self.initialiseoptions(self.__class__)
         self.previewer = previewer
         self.activeGui = []
-        self.loadClothingGUI()
+        self.cosmeticTypesGui = None
+        self.menuGui = None
+        self.clothingGuiEnabled = False
+        self.accessoryGuiEnabled = False
+        self.menuGuiVisible = False
+        # self.toggleClothingGui()
+        self.loadGui()
+        self.toggleMenuGui()
+        base.accept('4', self.toggleClothingGui)
 
-    def loadClothingGUI(self):
-        self.topButton = DirectButton(
+    @property
+    def marginX(self):
+        self._marginX -= self.xAmt
+        return self._marginX
+
+    @marginX.setter
+    def marginX(self, amt=0):
+        self._marginX = amt
+
+    @property
+    def marginY(self):
+        self._marginY -= self.yAmt
+        return self._marginY
+
+    # @marginY.setter
+    # def marginY(self, amt=0):
+    #     self._marginY = amt
+
+
+    def loadGui(self):
+        self.xAmt = 0
+        self.yAmt = 0.8
+        self.cosmeticTypesFrame = DirectFrame(
             parent = self,
-            text = ("Change Top"),
-            scale = 0.05, pos = (-1.6, 0, -0.4),
-            command = self.previewer.applyClothingChange,
-            extraArgs = ['torso-top']
-        )
-        self.sleeveButton = DirectButton(
-            text = ("Change Sleeve"),
-            scale = 0.05, pos = (-1.6, 0, -0.5),
-            command = self.previewer.applyClothingChange,
-            extraArgs = ['sleeves']
-        )
-        self.shortsButton = DirectButton(
-            text = ("Change Bottoms"),
-            scale = 0.05, pos = (-1.6, 0, -0.6),
-            command = self.previewer.applyClothingChange,
-            extraArgs = ['torso-bot']
-        )
-        #
-        self.loadSButton = DirectButton(
-            text = ("dogs"),
-            scale = 0.05, pos = (1.6, 0, -0.4),
-            command = self.previewer.setActiveBody,
-            extraArgs = ['s']
-        )
-        self.loadMButton = DirectButton(
-            text = ("dogm"),
-            scale = 0.05, pos = (1.6, 0, -0.5),
-            command = self.previewer.setActiveBody,
-            extraArgs = ['m']
-        )
-        self.loadLButton = DirectButton(
-            text = ("dogl"),
-            scale = 0.05, pos = (1.6, 0, -0.6),
-            command = self.previewer.setActiveBody,
-            extraArgs = ['l']
-        )
-        self.changeGenderButton = DirectButton(
-            text = ("Change gender"),
-            scale = 0.05, pos = (1.6, 0, -0.7),
-            command = self.previewer.setActiveBody,
-            extraArgs = [None, None, True]
-
+            pos = (-1.55, 0, 0.8),
+            scale = 0.15,
+            frameColor = (40/255, 40/255, 40/255, 1),
+            frameSize = (-1, 1, -3.5, 1),
         )
 
-    def unloadClothingGUI(self):
-        pass
+        self.cosmeticTypesGui = {
+            "btn_clothing": DirectButton(
+                parent = self.cosmeticTypesFrame,
+                text = ("Clothing"),
+                scale = 0.3, pos = (0, 0, self.marginY),
+                command = self.toggleClothingGui,
+            ),
+            "btn_hat": DirectButton(
+                parent = self.cosmeticTypesFrame,
+                text = ("Hat"),
+                scale = 0.3, pos = (0, 0, self.marginY),
+                command = self.toggleAccessoryGui,
+                extraArgs = ['hat']
+            ),
+            "btn_glasses": DirectButton(
+                parent = self.cosmeticTypesFrame,
+                text = ("Glasses"),
+                scale = 0.3, pos = (0, 0, self.marginY),
+                command = self.toggleAccessoryGui,
+                extraArgs = ['glasses']
+            ),
+            "btn_backpack": DirectButton(
+                parent = self.cosmeticTypesFrame,
+                text = ("Backpack"),
+                scale = 0.3, pos = (0, 0, self.marginY),
+                command = self.toggleAccessoryGui,
+                extraArgs = ['backpack']
+            ),
+            "btn_shoes": DirectButton(
+                parent = self.cosmeticTypesFrame,
+                text = ("Shoes"),
+                scale = 0.3, pos = (0, 0, self.marginY),
+                command = self.toggleAccessoryGui,
+                extraArgs = ['hat']
+            ),
+        }
+        # self.activeGui.append(self.menuGui)
+
+        self.clothingMenuFrame = DirectFrame(
+            parent = self,
+            pos = (-1.55, 0, -0.5),
+            # scale = 0.15,
+            frameColor = (40 / 255, 40 / 255, 40 / 255, 1),
+            frameSize = (-0.2, 0.2, -0.2, 0.3),
+            sortOrder=-1
+        )
+        self.yAmt = 0.1
+        self._marginY = 0.25
+        self.clothingGui = (
+            DirectButton(
+                parent = self.clothingMenuFrame,
+                text = ("Change Top"),
+                scale = 0.05, pos = (0, 0, self.marginY),
+                command = self.previewer.applyClothingChange,
+                extraArgs = ['torso-top']
+            ),
+            DirectButton(
+                parent = self.clothingMenuFrame,
+                text = ("Change Sleeve"),
+                scale = 0.05, pos = (0, 0, self.marginY),
+                command = self.previewer.applyClothingChange,
+                extraArgs = ['sleeves']
+            ),
+            DirectButton(
+                parent = self.clothingMenuFrame,
+                text = ("Change Bottoms"),
+                scale = 0.05, pos = (0, 0, self.marginY),
+                command = self.previewer.applyClothingChange,
+                extraArgs = ['torso-bot']
+            ), # frameColor
+            DirectButton(
+                text = ("dogs"),
+                scale = 0.05, pos = (1.6, 0, -0.4),
+                command = self.previewer.setActiveBody,
+                extraArgs = ['s']
+            ),
+            DirectButton(
+                text = ("dogm"),
+                scale = 0.05, pos = (1.6, 0, -0.5),
+                command = self.previewer.setActiveBody,
+                extraArgs = ['m']
+            ),
+            DirectButton(
+                text = ("dogl"),
+                scale = 0.05, pos = (1.6, 0, -0.6),
+                command = self.previewer.setActiveBody,
+                extraArgs = ['l']
+            ),
+            DirectButton(
+                text = ("Change gender"),
+                scale = 0.05, pos = (1.6, 0, -0.7),
+                command = self.previewer.setActiveBody,
+                extraArgs = [None, None, True]
+            ),
+        )
+
+        self.yAmt = 0.1
+        self._marginY = 0.25
+        self.accessoryGui = (
+            DirectButton(
+                parent = self.clothingMenuFrame,
+                text = ("Load Accessory"),
+                scale = 0.05, pos = (0, 0, self.marginY),
+                command = self.previewer.applyClothingChange,
+                extraArgs = ['torso-top']
+            ),
+        )
+        self.activeGui.append(self.clothingGui)
+
+        self.hideActiveGui()
+
+    @refresh_ui
+    def toggleClothingGui(self):
+        if self.clothingGuiEnabled:
+            # Hide everything
+            for button in self.clothingGui:
+                button.hide()
+            self.cosmeticTypesGui["btn_clothing"]["frameColor"] = (0.8, 0.8, 0.8, 1)
+            self.cosmeticTypesGui["btn_clothing"]["state"] = "normal"
+        else:
+            for button in self.clothingGui:
+                button.show()
+            self.activeGui.append(self.clothingGui)
+            self.previewer.viewBody(True)
+            # frameColor
+            self.cosmeticTypesGui["btn_clothing"]["frameColor"] = (0.5, 0.5, 0.5, 1)
+            self.cosmeticTypesGui["btn_clothing"]["state"] = "disabled"
+
+        self.clothingGuiEnabled = not self.clothingGuiEnabled
+        # ?
+        self.menuGuiVisible = False
+
+    # old
+    @refresh_ui
+    def toggleAccessoryGui(self, accType):
+        if not accType:
+            for button in self.accessoryGui:
+                button.hide()
+            self.accessoryGuiEnabled = False
+        # Disable it
+        if self.clothingGuiEnabled:
+            self.toggleClothingGui()
+        if not self.accessoryGuiEnabled:
+            for button in self.accessoryGui:
+                button.show()
+            self.activeGui.append(self.accessoryGui)
+        self.changeAccessoryGui(accType)
+        self.accessoryGuiEnabled = True
+
+    @refresh_ui
+    def changeAccessoryGui(self, accType):
+        # Change between different accessory menus
+        if self.previewer.activeAccessory and accType != self.previewer.activeAccessory.accessoryType:
+            # hide old buttons
+            for button in self.accessoryGui:
+                button.hide()
+            pass
+        for button in self.accessoryGui:
+            button.show()
+        self.activeGui.append(self.accessoryGui)
+        self.previewer.viewAccessory(accType)
+
+    @refresh_ui
+    def toggleMenuGui(self):
+        if not self.menuGui:
+            return
+        if self.menuGuiVisible:
+            for button in self.menuGui:
+                button.hide()
+        else:
+            for button in self.menuGui:
+                button.show()
+            self.activeGui.append(self.menuGui)
+            self.previewer.viewBody(False)
+
+        self.menuGuiVisible = not self.menuGuiVisible
+        self.clothingGuiEnabled = False
+
+    def hideActiveGui(self):
+        for guiSet in self.activeGui:
+            for guiElement in guiSet:
+                guiElement.hide()
+        self.activeGui = []
 
 
 class Cosmetic(NodePath):
@@ -268,8 +523,6 @@ class Cosmetic(NodePath):
         pass
 
     def loadTexture(self, file: str):
-        # self.sleeveTexFilepath = Filename.fromOsSpecific(str(file)).getDirname()
-        # self.textureFilepathKey[self.lastSelectedFilepath] = self.sleeveTexFilepath
         tex = loader.loadTexture(file)
         partNode = super().find(f'**/{self.targetNode}')
         if partNode:
@@ -284,27 +537,22 @@ class Cosmetic(NodePath):
             super().show()
 
 
-class Clothing(Cosmetic):
+class Accessory(Cosmetic):
+    def __init__(self, baseNode):
+        super().__init__(baseNode)
+        self.accessoryType = None
 
-    class BottomTypes(IntEnum):
-        SHORTS = 1
-        SKIRT = 2
+
+
+class Clothing(Cosmetic):
 
     def __init__(self, baseNode):
         # for the associated node we can do self.bodyGroup for clothing
         # so that we can affect all of them at once if need be
         super().__init__(baseNode)
-        self.skirtTexture = ""
-        self.shortsTexture = ""
-        self.topTexture = ""
-        self.sleeveTexture = ""
-        self.parts2texture = {
-            "torso-bot": "",
-            "sleeves": "",
-            "torso-top": "",
-        }
         self._loadedTexture = None
 
+    # loadTexture overriden
     def loadTexture(self, textureFile):
         tex = super().loadTexture(textureFile)
         self._loadedTexture = tex
@@ -315,15 +563,11 @@ class Clothing(Cosmetic):
             part = self.targetNode
         if not texture:
             texture = self._loadedTexture
-        print(f"part - {texture}")
         for node in self.findAllMatches(f"**/{part}"):
             node.setTexture(texture, 1)
 
-    # loadTexture overriden
 
 
-class Hat(Cosmetic):
-    pass
 
 
 if __name__ == "__main__":
